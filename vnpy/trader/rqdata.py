@@ -216,7 +216,7 @@ class JqdataClient:
             return False
 
         try:
-            jq.auth(username, password)
+            jq.auth(self.username, self.password)
             df = jq.get_all_securities(date=datetime.today())
             self.symbols = df.index.values
         except RuntimeError:
