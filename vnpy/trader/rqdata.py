@@ -205,7 +205,7 @@ class JqdataClient:
         self.symbols = None
 
     def init(self, username: str = "", password: str = "") -> bool:
-        if jq.is_auth():
+        if self.inited:
             return True
 
         if username and password:
