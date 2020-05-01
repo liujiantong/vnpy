@@ -1,11 +1,14 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from numpy import ndarray
+
 from rqdatac import init as rqdata_init
 from rqdatac.services.basic import all_instruments as rqdata_all_instruments
 from rqdatac.services.get_price import get_price as rqdata_get_price
 from rqdatac.share.errors import AuthenticationFailed
+
+import jqdatasdk as jq
 
 from .setting import SETTINGS
 from .constant import Exchange, Interval
@@ -22,6 +25,11 @@ INTERVAL_ADJUSTMENT_MAP = {
     Interval.MINUTE: timedelta(minutes=1),
     Interval.HOUR: timedelta(hours=1),
     Interval.DAILY: timedelta()         # no need to adjust for daily bar
+}
+
+EX_VT2JQ_DICT = {
+    Exchange.CFFEX: 'CCFX', Exchange.SHFE: 'XSGE', Exchange.CZCE: 'XZCE', Exchange.DCE: 'XDCE',
+    Exchange.INE: 'XINE', Exchange.SSE: 'XSHG', Exchange.SZSE: 'XSHE', Exchange.SGE: 'XSGE'
 }
 
 
@@ -185,4 +193,128 @@ class RqdataClient:
         return data
 
 
-rqdata_client = RqdataClient()
+class JqdataClient:
+    """
+    Client for querying history data from RQData.
+    """
+
+    def __init__(self):
+        self.username: str = SETTINGS["jqdata.username"]
+        self.password: str = SETTINGS["jqdata.password"]
+        self.symbols = None
+
+    def init(self, username: str = "", password: str = "") -> bool:
+        if jq.is_auth():
+            return True
+
+        if username and password:
+            self.username = username
+            self.password = password
+
+        if not self.username or not self.password:
+            return False
+
+        try:
+            jq.auth(username, password)
+            df = jq.get_all_securities(date=datetime.today())
+            self.symbols = df.index.values
+        except RuntimeError:
+            # TODO: logging here
+            return False
+        return True
+
+    @staticmethod
+    def to_jq_symbol(symbol: str, exchange: Exchange) -> str:
+        """
+        CZCE product of RQData has symbol like "TA1905" while
+        vt symbol is "TA905.CZCE" so need to add "1" in symbol.
+        """
+        jq_exchange = EX_VT2JQ_DICT.get(exchange, exchange.value)
+        if exchange == Exchange.CZCE:
+            # 郑商所 的合约代码年份只有三位 需要特殊处理
+            idx = 0
+            for idx, word in enumerate(symbol):
+                if word.isdigit():
+                    break
+
+            # Check for index symbol
+            time_str = symbol[idx:]
+            if time_str in ["88", "888", "99", "8888"]:
+                return symbol
+
+            product = symbol[:idx]
+            year = symbol[idx]
+            month = symbol[idx + 1:]
+            year = "1" + year if year == "9" else "2" + year
+            jq_symbol = f"{product}{year}{month}.{jq_exchange}"
+        else:
+            jq_symbol = f"{symbol}.{jq_exchange}"
+
+        return jq_symbol.upper()
+
+    def query_history(self, req: HistoryRequest) -> Optional[List[BarData]]:
+        """
+        Query history bar data from JQDataSDK.
+        """
+        symbol = req.symbol
+        exchange = req.exchange
+        interval = req.interval
+        start = req.start
+        end = req.end
+
+        jq_symbol = self.to_jq_symbol(symbol, exchange)
+        if jq_symbol not in self.symbols:
+            return None
+
+        jq_interval = INTERVAL_VT2RQ.get(interval)
+        if not jq_interval:
+            return None
+
+        # For adjust timestamp from bar close point (RQData) to open point (VN Trader)
+        adjustment = INTERVAL_ADJUSTMENT_MAP[interval]
+
+        # For querying night trading period data
+        now = datetime.now()
+        end = now if end >= now or (end.year == now.year and end.month == now.month and end.day == now.day) else end
+
+        # Only query open interest for futures contract
+        fields = ["open", "high", "low", "close", "volume"]
+        if not symbol.isdigit():
+            fields.append("open_interest")
+
+        df = jq.get_price(
+            jq_symbol,
+            frequency=jq_interval,
+            fields=fields,
+            start_date=start,
+            end_date=end,
+            skip_paused=True
+        )
+
+        if df is None:
+            return []
+
+        return [BarData(
+                symbol=symbol,
+                exchange=exchange,
+                interval=interval,
+                datetime=row.name.to_pydatetime() - adjustment,
+                open_price=row["open"],
+                high_price=row["high"],
+                low_price=row["low"],
+                close_price=row["close"],
+                volume=row["volume"],
+                open_interest=row.get("open_interest", 0),
+                gateway_name="JQ") for _, row in df.iterrows()]
+
+
+class VtDataClient:
+    def __init__(self):
+        u, p = SETTINGS["rqdata.username"], SETTINGS["rqdata.password"]
+        self.instance = RqdataClient() if (u and u != '') and (p and p != '') else JqdataClient()
+
+
+# rqdata_client = RqdataClient()
+rqdata_client = VtDataClient().instance
+
+

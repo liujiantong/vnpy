@@ -8,8 +8,8 @@ from typing import Dict, Any
 from .utility import load_json
 
 SETTINGS: Dict[str, Any] = {
-    "font.family": "Arial",
-    "font.size": 12,
+    "font.family": "Consolas",
+    "font.size": 11,
 
     "log.active": True,
     "log.level": CRITICAL,
@@ -25,6 +25,9 @@ SETTINGS: Dict[str, Any] = {
 
     "rqdata.username": "",
     "rqdata.password": "",
+
+    "jqdata.username": "",
+    "jqdata.password": "",
 
     "database.driver": "sqlite",  # see database.Driver
     "database.database": "database.db",  # for sqlite, use this as filepath
