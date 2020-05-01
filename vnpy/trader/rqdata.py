@@ -217,7 +217,7 @@ class JqdataClient:
 
         try:
             jq.auth(self.username, self.password)
-            df = jq.get_all_securities(date=datetime.today())
+            df = jq.get_all_securities(types=('stock', 'futures', 'etf', 'fund'), date=datetime.today())
             self.symbols = df.index.values
         except RuntimeError:
             # TODO: logging here
@@ -233,6 +233,7 @@ class JqdataClient:
         vt symbol is "TA905.CZCE" so need to add "1" in symbol.
         """
         jq_exchange = EX_VT2JQ_DICT.get(exchange, exchange.value)
+
         if exchange == Exchange.CZCE:
             # 郑商所 的合约代码年份只有三位 需要特殊处理
             idx = 0
@@ -269,7 +270,7 @@ class JqdataClient:
         if jq_symbol not in self.symbols:
             return None
 
-        jq_interval = INTERVAL_VT2RQ.get(interval)
+        jq_interval = INTERVAL_VT2RQ.get(interval, None)
         if not jq_interval:
             return None
 
