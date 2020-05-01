@@ -201,6 +201,7 @@ class JqdataClient:
     def __init__(self):
         self.username: str = SETTINGS["jqdata.username"]
         self.password: str = SETTINGS["jqdata.password"]
+        self.inited: bool = False
         self.symbols = None
 
     def init(self, username: str = "", password: str = "") -> bool:
@@ -221,6 +222,8 @@ class JqdataClient:
         except RuntimeError:
             # TODO: logging here
             return False
+
+        self.inited = True
         return True
 
     @staticmethod
