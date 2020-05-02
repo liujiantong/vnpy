@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+import pandas as pd
 from numpy import ndarray
 
 from rqdatac import init as rqdata_init
@@ -24,7 +25,15 @@ INTERVAL_VT2RQ = {
 INTERVAL_ADJUSTMENT_MAP = {
     Interval.MINUTE: timedelta(minutes=1),
     Interval.HOUR: timedelta(hours=1),
-    Interval.DAILY: timedelta()         # no need to adjust for daily bar
+    Interval.DAILY: timedelta(),         # no need to adjust for daily bar
+    Interval.WEEKLY: timedelta(),        # no need to adjust for weekly bar
+}
+
+INTERVAL_VT2JQ = {
+    Interval.MINUTE: "1m",
+    Interval.HOUR: "60m",
+    Interval.DAILY: "1d",
+    Interval.WEEKLY: "1w",
 }
 
 EX_VT2JQ_DICT = {
@@ -234,19 +243,22 @@ class JqdataClient:
         """
         jq_exchange = EX_VT2JQ_DICT.get(exchange, exchange.value)
 
-        if exchange == Exchange.CZCE:
-            # 郑商所 的合约代码年份只有三位 需要特殊处理
-            idx = 0
-            for idx, word in enumerate(symbol):
-                if word.isdigit():
-                    break
+        # Equity
+        if exchange in (Exchange.SSE, Exchange.SZSE):
+            return f"{symbol}.{jq_exchange}"
 
-            # Check for index symbol
-            time_str = symbol[idx:]
-            if time_str in ["88", "888", "99", "8888"]:
-                return symbol
+        idx = 0
+        for idx, word in enumerate(symbol):
+            if word.isdigit():
+                break
+        product, time_str = symbol[:idx], symbol[idx:]
 
-            product = symbol[:idx]
+        # Futures
+        if time_str in ("88", "888", "889", "8888", "99", "999", "9999"):
+            # Index symbol
+            jq_symbol = f"{product}8888.{jq_exchange}" if time_str.startswith('8') else f"{product}9999.{jq_exchange}"
+        elif exchange == Exchange.CZCE:
+            # 郑商所合约代码年份只有三位 需要特殊处理
             year = symbol[idx]
             month = symbol[idx + 1:]
             year = "1" + year if year == "9" else "2" + year
@@ -270,7 +282,7 @@ class JqdataClient:
         if jq_symbol not in self.symbols:
             return None
 
-        jq_interval = INTERVAL_VT2RQ.get(interval, None)
+        jq_interval = INTERVAL_VT2JQ.get(interval, None)
         if not jq_interval:
             return None
 
@@ -286,14 +298,14 @@ class JqdataClient:
         if not symbol.isdigit():
             fields.append("open_interest")
 
-        df = jq.get_price(
-            jq_symbol,
-            frequency=jq_interval,
-            fields=fields,
-            start_date=start,
-            end_date=end,
-            skip_paused=True
-        )
+        if jq_interval != '1w':
+            df = jq.get_price(jq_symbol, frequency=jq_interval, fields=fields, start_date=start, end_date=end, skip_paused=True)
+        else:
+            fields.append('date')
+            count = int((end - start).days * 5 / 7) + 1
+            df = jq.get_bars(jq_symbol, count=count, unit=jq_interval, fields=fields, end_dt=end)
+            df.set_index('date', inplace=True)
+            df.index = pd.to_datetime(df.index)
 
         if df is None:
             return []
