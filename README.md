@@ -1,4 +1,4 @@
-# By Traders, For Traders.
+# By Traders, For Traders (添加聚宽数据支持).
 
 <p align="center">
   <img src ="https://vnpy.oss-cn-shanghai.aliyuncs.com/vnpy-logo.png"/>
