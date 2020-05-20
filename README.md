@@ -254,9 +254,16 @@ vn.py使用Github托管其源代码，如果希望贡献代码请使用github的
   * 使用[flake8](https://pypi.org/project/flake8/)检查你的代码，确保没有error和warning。在项目根目录下运行```flake8```即可。
 
 
-## 安装 Patch for `jqdatasdk`
+## 使用 Patch for `jqdatasdk`
 ```bash
+# merge upstram into my fork
 cd ${vnpy_project_home}/vnpy/trader
+git fetch upstream
+git checkout master
+git merge upstream/master
+git checkout jqdata
+git merge master
+# overwrite `rqdata.py` and `setting.py` in vnstudio
 mv ${vnstudio_home}/Lib/site-packages/vnpy/trader/setting.py ${vnstudio_home}/Lib/site-packages/vnpy/trader/setting.py.bak
 mv ${vnstudio_home}/Lib/site-packages/vnpy/trader/rqdata.py ${vnstudio_home}/Lib/site-packages/vnpy/trader/rqdata.py.bak
 cp setting.py rqdata.py ${vnstudio_home}/Lib/site-packages/vnpy/trader/
