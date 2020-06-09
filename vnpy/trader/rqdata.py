@@ -1,3 +1,4 @@
+import pytz
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -40,6 +41,8 @@ EX_VT2JQ_DICT = {
     Exchange.CFFEX: 'CCFX', Exchange.SHFE: 'XSGE', Exchange.CZCE: 'XZCE', Exchange.DCE: 'XDCE',
     Exchange.INE: 'XINE', Exchange.SSE: 'XSHG', Exchange.SZSE: 'XSHE', Exchange.SGE: 'XSGE'
 }
+
+CHINA_TZ = pytz.timezone("Asia/Shanghai")
 
 
 class RqdataClient:
@@ -293,9 +296,8 @@ class JqdataClient:
         adjustment = INTERVAL_ADJUSTMENT_MAP[interval]
 
         # For querying night trading period data
-        # now = datetime.now()
-        # end = now if end >= now or (end.year == now.year and end.month == now.month and end.day == now.day) else end
-        end += timedelta(1)
+        now = datetime.now(CHINA_TZ)
+        end = now if end >= now or (end.year == now.year and end.month == now.month and end.day == now.day) else end
 
         # Only query open interest for futures contract
         fields = ["open", "high", "low", "close", "volume"]
