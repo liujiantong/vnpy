@@ -293,8 +293,9 @@ class JqdataClient:
         adjustment = INTERVAL_ADJUSTMENT_MAP[interval]
 
         # For querying night trading period data
-        now = datetime.now()
-        end = now if end >= now or (end.year == now.year and end.month == now.month and end.day == now.day) else end
+        # now = datetime.now()
+        # end = now if end >= now or (end.year == now.year and end.month == now.month and end.day == now.day) else end
+        end += timedelta(1)
 
         # Only query open interest for futures contract
         fields = ["open", "high", "low", "close", "volume"]
